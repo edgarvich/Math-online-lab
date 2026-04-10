@@ -1,37 +1,37 @@
 import streamlit as st
 import google.generativeai as genai
-from google.api_core import client_options
 
-# 1. Configuración de la API forzando la versión ESTABLE (v1)
-if "GOOGLE_API_KEY" in st.secrets:
-    # Esta línea es el "truco": le dice a la librería que ignore v1beta
-    options = client_options.ClientOptions(api_version='v1')
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"], client_options=options)
-
+# 1. Configuración de la página
 st.set_page_config(page_title="Math AI Lab", page_icon="🎓")
 st.title("👨‍🏫 Math AI Lab: Pizarra y Tutor")
 
-# 2. Cargar el modelo
-try:
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("Error al cargar el motor de IA.")
+# 2. Configuración de la API (Sencilla y Directa)
+if "GOOGLE_API_KEY" in st.secrets:
+    # Usamos la configuración estándar que funciona en todas las regiones
+    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+else:
+    st.error("No se encontró la clave de API.")
 
-# 3. Interfaz
-tema = st.text_input("Tema de hoy:", placeholder="Ej: suma de fracciones")
+# 3. Cargar el modelo estable
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-if st.button("Crear Pizarra"):
+# 4. Interfaz de usuario
+tema = st.text_input("¿Qué vamos a aprender hoy?", placeholder="Ej: Suma de fracciones")
+
+if st.button("Generar Material"):
     if tema:
         try:
-            with st.spinner("Generando contenido estable..."):
-                response = model.generate_content(f"Explica de forma sencilla: {tema}")
-                st.markdown("### 📝 Contenido de la Pizarra:")
+            with st.spinner("El profesor virtual está escribiendo..."):
+                # Generamos el contenido
+                response = model.generate_content(f"Actúa como un profesor de primaria. Explica de forma sencilla: {tema}")
+                st.markdown("### 📝 Contenido Sugerido para la Pizarra:")
                 st.write(response.text)
         except Exception as e:
-            st.error(f"Error de conexión: {e}")
-            st.info("💡 Consejo: Si el error persiste, dale a 'Reboot app' en el panel de Streamlit.")
+            st.error(f"Hubo un detalle al conectar con Google. Por favor, intenta de nuevo en un momento.")
+            # Mostramos el error técnico solo en consola para no ensuciar la pizarra
+            print(f"Error técnico: {e}")
     else:
-        st.warning("Escribe un tema primero.")
+        st.warning("Por favor, escribe un tema primero.")
 
 st.divider()
-st.caption("Proyecto de Maestría - Edgar Romero Valero")
+st.caption("Proyecto de Maestría en Tecnología Educativa - Edgar Romero Valero")
