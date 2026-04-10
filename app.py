@@ -24,7 +24,7 @@ tab1, tab2 = st.tabs(["📝 Pizarra del Profesor", "🤖 Chat del Estudiante"])
 # --- PESTAÑA 1: PIZARRA DEL PROFESOR ---
 with tab1:
     st.header("Generador de Clases")
-    st.write("Escribe un tema para que la IA genere una explicación clara para tus alumnos.")
+    st.write("Escribe un tema para que la IA genere una explicación clara.")
     
     tema = st.text_input("¿Qué concepto matemático explicaremos hoy?", placeholder="Ej: Suma de fracciones")
     
@@ -32,7 +32,6 @@ with tab1:
         if tema:
             try:
                 with st.spinner("Preparando la pizarra..."):
-                    # Usamos 'gemini-1.5-flash-latest' que es más estable
                     model = genai.GenerativeModel('gemini-1.5-flash-latest')
                     prompt = f"Actúa como un profesor de primaria rural. Explica de forma muy sencilla, paso a paso y con un ejemplo cotidiano: {tema}"
                     response = model.generate_content(prompt)
@@ -48,25 +47,28 @@ with tab1:
 # --- PESTAÑA 2: CHAT DEL ESTUDIANTE ---
 with tab2:
     st.header("Asistente Virtual de Matemáticas")
-    st.write("Ideal para que tus alumnos resuelvan dudas paso a paso.")
-
-    # Inicializar el historial de chat si no existe
+    
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Mostrar mensajes previos
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 
-    # Entrada de texto del alumno
     if prompt_alumno := st.chat_input("¿Qué parte no entendiste?"):
-        # Guardar mensaje del usuario
         st.session_state.messages.append({"role": "user", "content": prompt_alumno})
         with st.chat_message("user"):
             st.markdown(prompt_alumno)
 
-        # Generar respuesta de la IA
         try:
             with st.chat_message("assistant"):
-                model = genai.GenerativeModel('
+                model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                full_prompt = f"Eres un tutor de matemáticas amable. Ayuda al estudiante: {prompt_alumno}. Explica el proceso."
+                response = model.generate_content(full_prompt)
+                st.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
+        except Exception as e:
+            st.error(f"Error en el chat: {e}")
+
+st.markdown("---")
+st.caption("Laboratorio creado por Edgar Romero Valero - Maestría en Tecnología Educativa.")
