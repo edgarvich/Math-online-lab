@@ -1,44 +1,72 @@
 import streamlit as st
 import google.generativeai as genai
-import matplotlib.pyplot as plt
-import numpy as np
 
-# Configuración de la API (Se conectará a Streamlit Secrets después)
+# 1. CONFIGURACIÓN DE SEGURIDAD (API KEY)
 try:
-    API_KEY = st.secrets["GOOGLE_API_KEY"]
-except:
-    API_KEY = "PEGA_AQUI_TU_LLAVE_SOLO_PARA_PRUEBAS"
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+    else:
+        st.error("⚠️ Error: No se encontró la clave GOOGLE_API_KEY en los Secrets.")
+except Exception as e:
+    st.error(f"❌ Error al configurar la API: {e}")
 
-genai.configure(api_key=API_KEY)
+# 2. CONFIGURACIÓN DE LA PÁGINA
+st.set_page_config(page_title="Math AI Lab", page_icon="👨‍🏫", layout="wide")
 
+# Título Principal
 st.title("👨‍🏫 Math AI Lab: Pizarra y Tutor")
+st.markdown("---")
 
-tab1, tab2 = st.tabs(["Pizarra del Profesor", "Chat del Estudiante"])
+# 3. CREACIÓN DE PESTAÑAS (TABS)
+tab1, tab2 = st.tabs(["📝 Pizarra del Profesor", "🤖 Chat del Estudiante"])
 
+# --- PESTAÑA 1: PIZARRA DEL PROFESOR ---
 with tab1:
-    st.header("Pizarra Digital Inteligente")
-    tema = st.text_input("¿Qué vamos a explicar hoy?")
-    if st.button("Generar Material"):
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        res = model.generate_content(f"Explica brevemente {tema} con un ejemplo.")
-        st.write(res.text)
-        # Gráfico de ejemplo
-        fig, ax = plt.subplots()
-        ax.plot(np.random.simple_iter(10), np.random.simple_iter(10))
-        st.pyplot(fig)
+    st.header("Generador de Clases")
+    st.write("Escribe un tema para que la IA genere una explicación clara para tus alumnos.")
+    
+    tema = st.text_input("¿Qué concepto matemático explicaremos hoy?", placeholder="Ej: Suma de fracciones")
+    
+    if st.button("Generar Material de Pizarra"):
+        if tema:
+            try:
+                with st.spinner("Preparando la pizarra..."):
+                    # Usamos 'gemini-1.5-flash-latest' que es más estable
+                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                    prompt = f"Actúa como un profesor de primaria rural. Explica de forma muy sencilla, paso a paso y con un ejemplo cotidiano: {tema}"
+                    response = model.generate_content(prompt)
+                    
+                    st.success("¡Pizarra lista!")
+                    st.markdown("### 📝 Contenido Sugerido:")
+                    st.write(response.text)
+            except Exception as e:
+                st.error(f"Hubo un problema al conectar con la IA: {e}")
+        else:
+            st.warning("Por favor, escribe un tema primero.")
 
+# --- PESTAÑA 2: CHAT DEL ESTUDIANTE ---
 with tab2:
-    st.header("Asistente Virtual")
+    st.header("Asistente Virtual de Matemáticas")
+    st.write("Ideal para que tus alumnos resuelvan dudas paso a paso.")
+
+    # Inicializar el historial de chat si no existe
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    
-    for m in st.session_state.messages:
-        with st.chat_message(m["role"]): st.write(m["content"])
-    
-    pregunta = st.chat_input("¿Tienes alguna duda?")
-    if pregunta:
-        st.session_state.messages.append({"role": "user", "content": pregunta})
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        respuesta = model.generate_content(pregunta)
-        st.session_state.messages.append({"role": "assistant", "content": respuesta.text})
-        st.rerun()
+
+    # Mostrar mensajes previos
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    # Entrada de texto del alumno
+    if prompt_alumno := st.chat_input("¿Qué parte no entendiste?"):
+        # Guardar mensaje del usuario
+        st.session_state.messages.append({"role": "user", "content": prompt_alumno})
+        with st.chat_message("user"):
+            st.markdown(prompt_alumno)
+
+        # Generar respuesta de la IA
+        try:
+            with st.chat_message("assistant"):
+                model = genai.GenerativeModel('
