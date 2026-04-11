@@ -1,14 +1,15 @@
-# 🎓 Math-Online-Lab
-### Tutor Virtual Multimodal con IA
+# Math-Online-Lab 🎓
 
-Este proyecto es un laboratorio de matemáticas diseñado para potenciar el aprendizaje mediante **Google Gemini 1.5 Flash**.
+**EdTech Specialist: Edgar Romero Valero**
 
-## 🚀 Funcionalidades
-- **Pizarra Digital:** Generación de explicaciones y gráficos automáticos para el docente.
-- **Chatbot de Ayuda:** Asistente 24/7 para que los estudiantes resuelvan dudas con texto e imágenes.
-- **Enfoque Rural:** Diseñado para ser escalable y accesible.
+This project is a personalized Math Tutoring platform powered by **Google AI Studio (Gemini)**. It is designed to bridge the digital divide by providing high-quality, reasoning-centered math support.
 
-## 🛠️ Tecnologías
-- Python & Streamlit
-- Google Generative AI (Gemini API)
-- Matplotlib para gráficos científicos
+### How to Run
+1. Get an API Key from [Google AI Studio](https://aistudio.google.com/).
+2. Run locally with `streamlit run app.py` or deploy via Streamlit Cloud.
+3. Enter your API Key in the sidebar.
+
+### Project Goals
+- Emphasize conceptual math reasoning.
+- Provide step-by-step scaffolding for students.
+- Maintain a secure, privacy-focused educational environment.
