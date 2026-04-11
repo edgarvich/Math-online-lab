@@ -4,18 +4,17 @@ from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 
-# Configuración básica
 st.set_page_config(page_title="Math Lab", layout="wide")
 
-# Verificación de la llave
+# Conexión directa
 if "GEMINI_API_KEY" not in st.secrets:
-    st.error("Configura GEMINI_API_KEY en los Secrets de Streamlit.")
+    st.error("Configura GEMINI_API_KEY en Secrets.")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-# Inicialización del modelo (Sin prefijos complicados)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Usamos el nombre 'gemini-1.5-flash-latest' para forzar la versión más nueva
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 st.title("Math-Online-Lab 🎓")
 
@@ -31,22 +30,12 @@ with col1:
 
 with col2:
     st.subheader("Tutoría")
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-
-    for chat in st.session_state.chat_history:
-        with st.chat_message(chat["role"]):
-            st.markdown(chat["content"])
-
     if analyze_btn and canvas_result.image_data is not None:
         img = Image.fromarray(canvas_result.image_data.astype(np.uint8)).convert("RGB")
-        
         with st.chat_message("assistant"):
             try:
-                # Prompt directo para evitar errores de procesamiento
-                prompt_text = "Eres un tutor. Analiza la imagen y explica el problema paso a paso."
-                response = model.generate_content([prompt_text, img])
+                # El prompt ahora es un comando simple para probar conexión
+                response = model.generate_content(["Identifica el problema matemático en esta imagen y explícalo como un tutor.", img])
                 st.markdown(response.text)
-                st.session_state.chat_history.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"Error técnico: {e}")
+                st.error(f"Error: {e}")
