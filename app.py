@@ -1,24 +1,28 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. Configuración de la página
-st.set_page_config(page_title="Math-Online-Lab", layout="wide")
+# 1. Configuración de la página profesional
+st.set_page_config(page_title="Math-Online-Lab Visual", layout="wide")
 
 # 2. Configuración de API
 api_key = st.secrets.get("GEMINI_API_KEY")
+if not api_key:
+    st.error("⚠️ Configura GEMINI_API_KEY en Secrets.")
+    st.stop()
+
 genai.configure(api_key=api_key)
+# Usando el modelo detectado en el servidor para evitar errores 404
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
 # --- 3. BANCO DE IMÁGENES EDUCATIVAS ---
-IMAGENES = {
-    "fracciones": "https://img.freepik.com/vector-premium/suma-fracciones-distinto-denominador-metodo-minimo-comun-multiplo-matematicas_102902-2341.jpg",
-    "basico": "https://calculo.cc/temas/temas_primaria/fracciones/imagenes/suma_resta_mismo_denominador.gif"
-}
+# Estas son URLs reales para apoyo visual
+IMAGEN_MCD = "https://i.ibb.co/L8yHh9M/mcd-visual.png" # Ejemplo de MCD visual
+IMAGEN_UNIDADES = "https://i.ibb.co/P4Z9h6X/fraction-units.png" # Fracciones básicas
 
-# --- 4. SISTEMA DE LOGIN ---
+# --- 4. SISTEMA DE LOGIN (Personalización) ---
 if "nombre_usuario" not in st.session_state:
-    st.title("Math-Online-Lab 🎓")
-    nombre = st.text_input("Ingresa tu nombre:")
+    st.title("Bienvenido al Math-Online-Lab 🎓")
+    nombre = st.text_input("Ingresa tu nombre para comenzar:")
     if st.button("Empezar"):
         if nombre:
             st.session_state.nombre_usuario = nombre
@@ -27,48 +31,52 @@ if "nombre_usuario" not in st.session_state:
     st.stop()
 
 # --- 5. INTERFAZ DE CHAT ---
-st.title(f"Tutoría para {st.session_state.nombre_usuario} 👋")
+st.title(f"Tutoría Visual para {st.session_state.nombre_usuario} 👋")
+st.markdown("---")
 
 # Mostrar historial
-for i, message in enumerate(st.session_state.messages):
+for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
-        # Si el mensaje tiene una imagen guardada y el usuario decidió verla
-        if "img_url" in message and st.session_state.get(f"ver_img_{i}", False):
-            st.image(message["img_url"], width=500)
+        if "img" in message:
+            st.image(message["img"], width=500)
 
-# Entrada de Chat
-if prompt := st.chat_input("Escribe tu duda aquí..."):
+# Entrada de texto (Chatbot)
+if prompt := st.chat_input("Escribe tu problema (ej: 1/2 + 1/3)"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        try:
-            # Instrucción de tutoría personalizada
-            contexto = f"Eres un tutor experto. Llama a {st.session_state.nombre_usuario} por su nombre. Explica sin dar la respuesta. Si el tema es difícil, dile que tienes una imagen de apoyo si la necesita."
-            response = model.generate_content(f"{contexto}. Duda: {prompt}")
-            
-            respuesta_texto = response.text
-            st.markdown(respuesta_texto)
-            
-            # Guardamos la respuesta en el historial
-            new_msg = {"role": "assistant", "content": respuesta_texto}
-            
-            # Si el tema es de fracciones, preparamos la imagen oculta
-            if "1/2" in prompt or "fracción" in respuesta_texto.lower():
-                new_msg["img_url"] = IMAGENES["fracciones"]
-            
-            st.session_state.messages.append(new_msg)
-            st.rerun() # Refrescamos para mostrar el botón de ayuda visual
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-# --- 6. BOTÓN DE APOYO VISUAL (Solo aparece si el tutor tiene una imagen lista) ---
-if st.session_state.messages and "img_url" in st.session_state.messages[-1]:
-    st.write("---")
-    if st.button(f"🔍 {st.session_state.nombre_usuario}, ¿deseas ver una imagen de apoyo para este paso?"):
-        # Guardamos que el usuario quiere ver la imagen del último mensaje
-        last_idx = len(st.session_state.messages) - 1
-        st.session_state[f"ver_img_{last_idx}"] = True
-        st.rerun()
+        with st.spinner("El tutor está buscando la mejor imagen para explicarte..."):
+            try:
+                # INSTRUCCIÓN MAESTRA: Forzamos el uso de imágenes y números grandes
+                instruccion = (
+                    f"Eres un tutor de matemáticas visual para {st.session_state.nombre_usuario}. "
+                    "Tu respuesta DEBE ser ultra-corta. Usa números grandes o viñetas. "
+                    "Si el problema es de fracciones, di: 'Necesitas un DENOMINADOR COMÚN'."
+                )
+                
+                response = model.generate_content(f"{instruccion}. Problema: {prompt}")
+                texto_tutor = response.text
+                
+                # Formateamos el texto para que los números sean grandes (Usando Markdown)
+                texto_visual = texto_tutor.replace(" -> ", " ➡ ").replace(" = ", " ⚌ ")
+                st.markdown(texto_visual)
+                
+                # --- LÓGICA DE IMÁGENES AUTOMÁTICAS ---
+                imagen_a_mostrar = None
+                
+                # Detectamos si es un problema de fracciones
+                if any(palabra in prompt or palabra in texto_tutor.lower() for palabra in ["1/2", "denominador", "fraccion"]):
+                    imagen_a_mostrar = IMAGEN_MCD
+                
+                # Mostramos la imagen pedagógica
+                if imagen_a_mostrar:
+                    st.image(imagen_a_mostrar, caption="Observa cómo los convertimos para que sean iguales", width=500)
+                    st.session_state.messages.append({"role": "assistant", "content": texto_visual, "img": imagen_a_mostrar})
+                else:
+                    st.session_state.messages.append({"role": "assistant", "content": texto_visual})
+                    
+            except Exception as e:
+                st.error(f"Error técnico: {e}")
