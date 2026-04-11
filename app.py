@@ -2,56 +2,63 @@ import streamlit as st
 import google.generativeai as genai
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Math-Online-Lab Voz", layout="wide")
+st.set_page_config(page_title="Math Lab Global", layout="wide")
 
-# Configuración de API
+# Configuración de API (Gemini 2.5 Flash por velocidad y razonamiento)
 api_key = st.secrets.get("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
-# --- FUNCIÓN DE VOZ (JavaScript) ---
-def leer_en_voz_alta(texto):
-    # Este script usa el sintetizador nativo del navegador (Chrome/Edge/Safari)
+# --- VOZ AUTOMÁTICA ---
+def hablar(texto):
     js_code = f"""
     <script>
     var msg = new SpeechSynthesisUtterance('{texto.replace("'", "")}');
     msg.lang = 'es-ES';
-    msg.rate = 0.9; 
+    msg.rate = 1.0;
     window.speechSynthesis.speak(msg);
     </script>
     """
     components.html(js_code, height=0)
 
-# --- INTERFAZ ---
-st.title(f"Tutoría por Voz para {st.session_state.get('nombre', 'Edgar')} 🔊")
+# --- LOGIN PERSONALIZADO ---
+if "nombre" not in st.session_state:
+    st.title("Math-Online-Lab 🎓")
+    nombre = st.text_input("Ingresa tu nombre para iniciar tu ruta de aprendizaje:")
+    if st.button("Comenzar"):
+        st.session_state.nombre = nombre
+        st.session_state.historial = []
+        st.rerun()
+    st.stop()
 
-if prompt := st.chat_input("Dime tu duda sobre fracciones..."):
+st.title(f"Centro de Matemáticas: {st.session_state.nombre} 🧠")
+
+# --- LÓGICA DE ÁREAS ---
+if prompt := st.chat_input("¿Qué área vamos a dominar hoy? (Fracciones, Álgebra, Geometría...)"):
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
+        # Instrucción para cubrir TODAS las áreas con Scaffolding
+        instruccion = (
+            f"Eres el Tutor Maestro de {st.session_state.nombre}. Dominas todas las áreas: "
+            "Aritmética, Álgebra, Geometría y Estadística. "
+            "Usa números GRANDES con $$ (LaTeX). Explica con analogías visuales."
+        )
+        
         try:
-            # Instrucción enfocada solo en fracciones
-            guion = (
-                f"Eres un tutor experto en fracciones. Llama a {st.session_state.get('nombre', 'Edgar')} por su nombre. "
-                "Usa números GRANDES con $$. Explica paso a paso de forma muy breve."
-            )
-            response = model.generate_content(f"{guion}. Pregunta: {prompt}")
-            texto_respuesta = response.text
+            response = model.generate_content(f"{instruccion}. Pregunta: {prompt}")
+            texto = response.text
+            st.markdown(texto)
+            hablar(texto.replace("$", "").replace("*", ""))
             
-            # 1. Mostrar Texto
-            st.markdown(texto_respuesta)
-            
-            # 2. Mostrar Imagen de Apoyo
-            if "/" in prompt:
-                st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Fraction_addition.svg/1200px-Fraction_addition.svg.png", 
-                         caption="Visualización: El concepto de partes iguales", width=500)
+            # Soporte Visual Dinámico por área
+            if any(x in prompt.lower() for x in ["fraccion", "denominador"]):
                 
-
-            # 3. ACTIVAR VOZ AUTOMÁTICA
-            # Limpiamos símbolos raros para que la voz sea fluida
-            texto_para_voz = texto_respuesta.replace("$", "").replace("#", "").replace("*", "")
-            leer_en_voz_alta(texto_para_voz)
-            
+            elif "ecuacion" in prompt.lower() or "x" in prompt.lower():
+                
+            elif "geometria" in prompt.lower() or "area" in prompt.lower():
+                
+                
         except Exception as e:
             st.error(f"Error: {e}")
