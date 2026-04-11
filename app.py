@@ -11,15 +11,18 @@ st.set_page_config(page_title="Math-Online-Lab", page_icon="🎓", layout="wide"
 st.sidebar.title("Configuration")
 user_api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
 api_key = user_api_key if user_api_key else st.secrets.get("GEMINI_API_KEY")
+
+# Updated model list to use the most stable naming conventions
 model_option = st.sidebar.selectbox("Select Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
 
 if not api_key:
     st.warning("⚠️ Please enter your API Key in the sidebar.")
     st.stop()
 
-# Initialize Gemini
+# Initialize Gemini with the correct naming logic
 genai.configure(api_key=api_key)
-model = genai.GenerativeModel(model_name=f"models/{model_option}")
+# We use the model name directly; if it fails, the app will show a specific error
+model = genai.GenerativeModel(model_name=model_option)
 
 st.title("Math-Online-Lab 🧠")
 st.caption("Interactive Math Tutoring with Visual Recognition")
@@ -31,7 +34,7 @@ with col1:
     st.subheader("Interactive Whiteboard")
     canvas_result = st_canvas(
         fill_color="rgba(255, 165, 0, 0.3)",
-        stroke_width=3,
+        stroke_width=4,
         stroke_color="#000000",
         background_color="#ffffff",
         height=400,
@@ -55,34 +58,34 @@ with col2:
     # Handle Text Input
     prompt = st.chat_input("Ask a question about your drawing...")
 
-    # LOGIC: If user sends whiteboard OR types a message
     if send_whiteboard or prompt:
         user_content = []
         
-        # 1. Process the image if it exists
+        # Process the image from the whiteboard
         if canvas_result.image_data is not None:
-            # Convert canvas data to a PIL Image
+            # Convert canvas data to a format Gemini understands
             img_data = canvas_result.image_data.astype(np.uint8)
             img = Image.fromarray(img_data).convert("RGB")
             user_content.append(img)
         
-        # 2. Process text prompt
-        text_query = prompt if prompt else "Please analyze the math problem I drew on the whiteboard. Help me solve it step-by-step."
+        # Create the text instruction
+        text_query = prompt if prompt else "Analyze the math problem I drew. Act as a tutor: guide me step-by-step without giving the answer immediately."
         user_content.append(text_query)
 
-        # Update UI for user
+        # Show the user's message in the chat
         st.session_state.messages.append({"role": "user", "content": text_query})
         with st.chat_message("user"):
             st.markdown(text_query)
 
-        # 3. Get AI Response
+        # Get AI Response
         with st.chat_message("assistant"):
             try:
-                # System instructions embedded in the call
-                instruction = "Act as a math tutor. Use scaffolding. Do not give the answer immediately. Analyze the provided image if available."
-                response = model.generate_content([instruction] + user_content)
+                # The combined multimodal call (Image + Text)
+                response = model.generate_content(user_content)
                 
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"Error: {e}")
+                # Direct error reporting to help us debug
+                st.error(f"Connection Error: {e}")
+                st.info("Tip: Try switching between 'flash' and 'pro' in the sidebar.")
