@@ -4,46 +4,27 @@ from streamlit_drawable_canvas import st_canvas
 from PIL import Image
 import numpy as np
 
-# Page Configuration
-st.set_page_config(page_title="Math-Online-Lab", page_icon="🎓", layout="wide")
+# 1. Page Config
+st.set_page_config(page_title="Math Lab", layout="wide")
 
-# --- API SETUP ---
+# 2. API Key from Secrets
 api_key = st.secrets.get("GEMINI_API_KEY")
 
 if not api_key:
-    st.sidebar.title("Configuration")
-    api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
-    if not api_key:
-        st.warning("⚠️ Please add GEMINI_API_KEY to your Streamlit Secrets.")
-        st.stop()
+    st.error("Please add GEMINI_API_KEY to Streamlit Secrets.")
+    st.stop()
 
+# 3. Configure AI
 genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-# --- THE "UNIVERSAL" MODEL FIX ---
-# This list covers all possible naming conventions to stop the 404 error
-model_options = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-1.5-pro", "models/gemini-1.5-pro"]
-selected_base = st.sidebar.selectbox("Select Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
+st.title("Math-Online-Lab 🎓")
 
-# We attempt to initialize the model. If it fails, we try the alternative prefix.
-try:
-    model = genai.GenerativeModel(model_name=selected_base)
-    # Test a tiny call to verify the name is accepted by the server
-    model.generate_content("test")
-except Exception:
-    try:
-        model = genai.GenerativeModel(model_name=f"models/{selected_base}")
-    except Exception as e:
-        st.error(f"Critical Connection Error: {e}")
-        st.stop()
-
-st.title("Math-Online-Lab 🧠")
-st.caption("Interactive Math Tutoring with Visual Recognition")
-
-# --- LAYOUT ---
-col1, col2 = st.columns([1, 1])
+# 4. Layout
+col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Interactive Whiteboard")
+    st.subheader("Whiteboard")
     canvas_result = st_canvas(
         stroke_width=4,
         stroke_color="#000000",
@@ -52,40 +33,25 @@ with col1:
         drawing_mode="freedraw",
         key="canvas",
     )
-    
-    send_whiteboard = st.button("📤 Send Whiteboard to AI")
-    if st.button("🗑️ Clear Board"):
-        st.rerun()
+    send_btn = st.button("Analyze Drawing")
 
 with col2:
-    st.subheader("Math Tutor Chat")
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    st.subheader("Tutor")
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+    for chat in st.session_state.chat_history:
+        with st.chat_message(chat["role"]):
+            st.markdown(chat["content"])
 
-    prompt = st.chat_input("Ask a question about your drawing...")
-
-    if send_whiteboard or prompt:
-        user_content = []
-        if canvas_result.image_data is not None:
-            img_data = canvas_result.image_data.astype(np.uint8)
-            img = Image.fromarray(img_data).convert("RGB")
-            user_content.append(img)
+    if send_btn and canvas_result.image_data is not None:
+        # Convert drawing to image
+        img = Image.fromarray(canvas_result.image_data.astype(np.uint8)).convert("RGB")
         
-        text_query = prompt if prompt else "Analyze the math problem I drew. Help me solve it step-by-step."
-        user_content.append(text_query)
-
-        st.session_state.messages.append({"role": "user", "content": text_query})
-        with st.chat_message("user"):
-            st.markdown(text_query)
-
         with st.chat_message("assistant"):
             try:
-                response = model.generate_content(user_content)
+                response = model.generate_content(["Solve this math problem step-by-step as a tutor.", img])
                 st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
+                st.session_state.chat_history.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"AI Error: {e}")
+                st.error(f"Error: {e}")
