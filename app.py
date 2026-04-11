@@ -7,32 +7,34 @@ import numpy as np
 # Page Configuration
 st.set_page_config(page_title="Math-Online-Lab", page_icon="🎓", layout="wide")
 
-# --- SECRET & API SETUP ---
-# Pulls automatically from Streamlit Secrets (Vault)
+# --- API SETUP ---
 api_key = st.secrets.get("GEMINI_API_KEY")
 
-# Sidebar Configuration
-st.sidebar.title("Configuration")
-
 if not api_key:
+    st.sidebar.title("Configuration")
     api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
     if not api_key:
-        st.warning("⚠️ Please add GEMINI_API_KEY to your Streamlit Secrets or enter it manually.")
+        st.warning("⚠️ Please add GEMINI_API_KEY to your Streamlit Secrets.")
         st.stop()
-else:
-    st.sidebar.success("✅ API Key loaded automatically!")
 
-# Stable model selection
-model_option = st.sidebar.selectbox("Select Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
-
-# Initialize Gemini with robust naming logic
 genai.configure(api_key=api_key)
 
-# This logic handles the 404 error by trying multiple naming formats
+# --- THE "UNIVERSAL" MODEL FIX ---
+# This list covers all possible naming conventions to stop the 404 error
+model_options = ["gemini-1.5-flash", "models/gemini-1.5-flash", "gemini-1.5-pro", "models/gemini-1.5-pro"]
+selected_base = st.sidebar.selectbox("Select Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
+
+# We attempt to initialize the model. If it fails, we try the alternative prefix.
 try:
-    model = genai.GenerativeModel(model_name=model_option)
+    model = genai.GenerativeModel(model_name=selected_base)
+    # Test a tiny call to verify the name is accepted by the server
+    model.generate_content("test")
 except Exception:
-    model = genai.GenerativeModel(model_name=f"models/{model_option}")
+    try:
+        model = genai.GenerativeModel(model_name=f"models/{selected_base}")
+    except Exception as e:
+        st.error(f"Critical Connection Error: {e}")
+        st.stop()
 
 st.title("Math-Online-Lab 🧠")
 st.caption("Interactive Math Tutoring with Visual Recognition")
@@ -43,7 +45,6 @@ col1, col2 = st.columns([1, 1])
 with col1:
     st.subheader("Interactive Whiteboard")
     canvas_result = st_canvas(
-        fill_color="rgba(255, 165, 0, 0.3)",
         stroke_width=4,
         stroke_color="#000000",
         background_color="#ffffff",
@@ -69,27 +70,22 @@ with col2:
 
     if send_whiteboard or prompt:
         user_content = []
-        
-        # 1. Process Whiteboard Image
         if canvas_result.image_data is not None:
             img_data = canvas_result.image_data.astype(np.uint8)
             img = Image.fromarray(img_data).convert("RGB")
             user_content.append(img)
         
-        # 2. Process Text Prompt
-        text_query = prompt if prompt else "Analyze the math problem I drew and guide me step-by-step using scaffolding. Do not give the answer immediately."
+        text_query = prompt if prompt else "Analyze the math problem I drew. Help me solve it step-by-step."
         user_content.append(text_query)
 
         st.session_state.messages.append({"role": "user", "content": text_query})
         with st.chat_message("user"):
             st.markdown(text_query)
 
-        # 3. Get AI Response
         with st.chat_message("assistant"):
             try:
-                # Use the multimodal call
                 response = model.generate_content(user_content)
                 st.markdown(response.text)
                 st.session_state.messages.append({"role": "assistant", "content": response.text})
             except Exception as e:
-                st.error(f"Error: {e}")
+                st.error(f"AI Error: {e}")
