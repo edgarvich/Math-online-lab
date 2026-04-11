@@ -1,17 +1,16 @@
 import streamlit as st
 import google.generativeai as genai
 import streamlit.components.v1 as components
-from datetime import datetime
 
-# Configuración Profesional
-st.set_page_config(page_title="Math-Lab RAG Pro", layout="wide")
+# 1. Configuración de página
+st.set_page_config(page_title="Math Lab Adaptativo", layout="wide")
 
-# Conexión al Cerebro (Gemini 2.5 Flash)
+# 2. Configuración de la IA (Gemini 2.5 Flash)
 api_key = st.secrets.get("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
-# --- FUNCIÓN DE VOZ ---
+# --- VOZ ---
 def hablar(texto):
     js_code = f"""<script>
     var msg = new SpeechSynthesisUtterance('{texto.replace("'", "")}');
@@ -20,65 +19,77 @@ def hablar(texto):
     </script>"""
     components.html(js_code, height=0)
 
-# --- SISTEMA DE "MEMORIA" (Simulación de RAG persistente) ---
-if "historial_fallas" not in st.session_state:
-    st.session_state.historial_fallas = []
+# --- INICIALIZACIÓN DE ESTADOS ---
+if "estado" not in st.session_state:
+    st.session_state.estado = "registro"  # registro -> diagnostico -> tutoria
+    st.session_state.fallas_diagnostico = []
+    st.session_state.pregunta_actual = 0
 
-# --- LOGIN ---
-if "nombre" not in st.session_state:
-    st.title("Math-Online-Lab: Sistema Adaptativo 🎓")
-    nombre = st.text_input("Ingresa tu nombre para recuperar tu progreso:")
-    if st.button("Iniciar Sesión"):
-        st.session_state.nombre = nombre
-        st.rerun()
+# --- PANTALLA 1: REGISTRO ---
+if st.session_state.estado == "registro":
+    st.title("🎓 Bienvenido al Math-Online-Lab")
+    nombre = st.text_input("Hola, ¿cómo te llamas?")
+    if st.button("Comenzar Evaluación"):
+        if nombre:
+            st.session_state.nombre = nombre
+            st.session_state.estado = "diagnostico"
+            st.rerun()
     st.stop()
 
-st.title(f"Pizarra de Aprendizaje: {st.session_state.nombre} 🧠")
-
-# --- INTERFAZ DE TUTORÍA CON RAG ---
-if prompt := st.chat_input("Plantea tu ejercicio o duda matemática..."):
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        # RECUPERACIÓN (Retrieval): Buscamos fallas previas en la memoria
-        fallas_contexto = ", ".join(st.session_state.historial_fallas[-3:]) # Últimas 3 fallas
+# --- PANTALLA 2: DIAGNÓSTICO (5 Preguntas clave) ---
+if st.session_state.estado == "diagnostico":
+    preguntas = [
+        {"q": "Suma: 1/4 + 2/4", "a": "3/4", "tema": "Fracciones Homogéneas"},
+        {"q": "Denominador común para 1/2 y 1/3", "a": "6", "tema": "MCD"},
+        {"q": "Si x + 5 = 15, ¿cuánto vale x?", "a": "10", "tema": "Ecuaciones"},
+        {"q": "Área de un cuadrado de lado 4", "a": "16", "tema": "Geometría"},
+        {"q": "Resultado de 7 x 0", "a": "0", "tema": "Aritmética básica"}
+    ]
+    
+    idx = st.session_state.pregunta_actual
+    st.title(f"Evaluación Inicial para {st.session_state.nombre}")
+    st.progress((idx + 1) / len(preguntas))
+    
+    st.subheader(preguntas[idx]["q"])
+    respuesta = st.text_input("Tu respuesta:", key=f"ans_{idx}")
+    
+    if st.button("Siguiente"):
+        if respuesta.strip() != preguntas[idx]["a"]:
+            st.session_state.fallas_diagnostico.append(preguntas[idx]["tema"])
         
-        # AUMENTO (Augmentation): Inyectamos las fallas en el prompt
+        if idx < len(preguntas) - 1:
+            st.session_state.pregunta_actual += 1
+            st.rerun()
+        else:
+            st.session_state.estado = "tutoria"
+            st.rerun()
+    st.stop()
+
+# --- PANTALLA 3: TUTORÍA CON RAG (Basada en Fallas) ---
+st.title(f"Tutoría Personalizada: {st.session_state.nombre} 🧠")
+
+with st.sidebar:
+    st.header("Perfil del Estudiante")
+    if st.session_state.fallas_diagnostico:
+        st.warning("Temas a reforzar:")
+        for f in set(st.session_state.fallas_diagnostico):
+            st.write(f"• {f}")
+    else:
+        st.success("¡Nivel excelente! Listo para retos avanzados.")
+
+if prompt := st.chat_input("¿Qué quieres practicar ahora?"):
+    with st.chat_message("assistant"):
+        # RAG: Inyectamos los resultados del diagnóstico en la IA
+        contexto_fallas = ", ".join(st.session_state.fallas_diagnostico)
         instruccion = (
-            f"Eres un Tutor IA con memoria RAG para {st.session_state.nombre}. "
-            f"El alumno ha fallado anteriormente en: {fallas_contexto}. "
-            "Usa esta información para dar una explicación que ataque sus puntos débiles. "
-            "Usa números GRANDES con $$ y lenguaje motivador."
+            f"Eres el tutor de {st.session_state.nombre}. En el diagnóstico, falló en: {contexto_fallas}. "
+            "Usa andamiaje (scaffolding). No des la respuesta, guía visualmente con $$."
         )
         
-        try:
-            response = model.generate_content(f"{instruccion}. Pregunta actual: {prompt}")
-            texto_tutor = response.text
-            st.markdown(texto_tutor)
-            hablar(texto_tutor.replace("$", "").replace("*", ""))
-            
-            # --- ANÁLISIS AUTOMÁTICO DE FALLAS (Para el RAG) ---
-            # Si el tutor detecta que el alumno no entendió, guarda la falla
-            if "no entiendo" in prompt.lower() or "difícil" in prompt.lower():
-                st.session_state.historial_fallas.append(prompt)
-                st.sidebar.warning(f"Falla registrada: {prompt}")
-
-            # Soporte Visual Dinámico
-            if "/" in prompt:
-                st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Fraction_addition.svg/1200px-Fraction_addition.svg.png", caption="Visualización del concepto")
-                
-
-        except Exception as e:
-            st.error(f"Error: {e}")
-
-# --- PANEL DEL DOCENTE (Análisis RAG) ---
-with st.sidebar:
-    st.header("Análisis de Progreso")
-    st.write(f"**Alumno:** {st.session_state.nombre}")
-    if st.session_state.historial_fallas:
-        st.write("### Mapa de errores detectados:")
-        for f in st.session_state.historial_fallas:
-            st.write(f"❌ {f}")
-    else:
-        st.success("Aún no hay fallas registradas.")
+        response = model.generate_content(f"{instruccion}. Pregunta: {prompt}")
+        st.markdown(response.text)
+        hablar(response.text.replace("$", ""))
+        
+        # Apoyo Visual automático
+        if "fraccion" in prompt.lower() or "fraccion" in contexto_fallas.lower():
+            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Fraction_addition.svg/1200px-Fraction_addition.svg.png")
