@@ -1,45 +1,57 @@
 import streamlit as st
 import google.generativeai as genai
+import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Fracciones Lab", layout="wide")
+st.set_page_config(page_title="Math-Online-Lab Voz", layout="wide")
 
-# Configuración con el modelo que SÍ funciona en tu servidor
+# Configuración de API
 api_key = st.secrets.get("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('models/gemini-2.5-flash')
 
-# --- ESTADO DEL APRENDIZAJE ---
-if "tema" not in st.session_state:
-    st.session_state.tema = "Fracciones"
-    st.session_state.mensajes = []
+# --- FUNCIÓN DE VOZ (JavaScript) ---
+def leer_en_voz_alta(texto):
+    # Este script usa el sintetizador nativo del navegador (Chrome/Edge/Safari)
+    js_code = f"""
+    <script>
+    var msg = new SpeechSynthesisUtterance('{texto.replace("'", "")}');
+    msg.lang = 'es-ES';
+    msg.rate = 0.9; 
+    window.speechSynthesis.speak(msg);
+    </script>
+    """
+    components.html(js_code, height=0)
 
-st.title(f"Laboratorio de {st.session_state.tema} 🍕")
-st.write(f"Hola **{st.session_state.get('nombre', 'Edgar')}**, hoy nos enfocaremos solo en entender las fracciones.")
+# --- INTERFAZ ---
+st.title(f"Tutoría por Voz para {st.session_state.get('nombre', 'Edgar')} 🔊")
 
-# Mostrar historial
-for m in st.session_state.mensajes:
-    with st.chat_message(m["role"]):
-        st.markdown(m["content"])
-
-# Entrada del Estudiante
 if prompt := st.chat_input("Dime tu duda sobre fracciones..."):
-    st.session_state.mensajes.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        # INSTRUCCIÓN: Solo fracciones, números grandes, paso a paso.
-        guion = (
-            f"Eres un tutor experto en fracciones para {st.session_state.get('nombre', 'Edgar')}. "
-            "NO hables de ecuaciones ni de secuencias. "
-            "Usa números GRANDES con $$ para cada paso. "
-            "Explica por qué los denominadores deben ser iguales antes de sumar."
-        )
-        response = model.generate_content(f"{guion}. Pregunta: {prompt}")
-        st.markdown(response.text)
-        st.session_state.mensajes.append({"role": "assistant", "content": response.text})
-        
-        # Imagen de apoyo obligatoria para fracciones
-        if "/" in prompt:
-            st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Fraction_addition.svg/1200px-Fraction_addition.svg.png", 
-                     caption="Visualización: ¿Por qué necesitamos partes iguales?", width=500)
+        try:
+            # Instrucción enfocada solo en fracciones
+            guion = (
+                f"Eres un tutor experto en fracciones. Llama a {st.session_state.get('nombre', 'Edgar')} por su nombre. "
+                "Usa números GRANDES con $$. Explica paso a paso de forma muy breve."
+            )
+            response = model.generate_content(f"{guion}. Pregunta: {prompt}")
+            texto_respuesta = response.text
+            
+            # 1. Mostrar Texto
+            st.markdown(texto_respuesta)
+            
+            # 2. Mostrar Imagen de Apoyo
+            if "/" in prompt:
+                st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/5f/Fraction_addition.svg/1200px-Fraction_addition.svg.png", 
+                         caption="Visualización: El concepto de partes iguales", width=500)
+                
+
+            # 3. ACTIVAR VOZ AUTOMÁTICA
+            # Limpiamos símbolos raros para que la voz sea fluida
+            texto_para_voz = texto_respuesta.replace("$", "").replace("#", "").replace("*", "")
+            leer_en_voz_alta(texto_para_voz)
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
