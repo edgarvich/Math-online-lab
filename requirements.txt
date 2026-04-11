@@ -1,3 +1,5 @@
 streamlit
 google-generativeai
+streamlit-drawable-canvas
+streamlit-mic-recorder
 Pillow
