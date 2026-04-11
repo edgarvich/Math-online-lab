@@ -1,32 +1,47 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. Configuración de la API
-if "GOOGLE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# Page Setup
+st.set_page_config(page_title="Math-Online-Lab", page_icon="🎓")
 
-st.set_page_config(page_title="Math AI Lab", page_icon="🎓")
-st.title("👨‍🏫 Math AI Lab: Pizarra y Tutor")
+# Sidebar for API Key & Model Selection
+st.sidebar.title("Configuration")
+user_api_key = st.sidebar.text_input("Enter Gemini API Key:", type="password")
 
-# 2. MODELO UNIVERSAL (Este tiene mayor compatibilidad regional)
-model = genai.GenerativeModel('gemini-pro')
+# Fallback to Streamlit Secrets if available
+api_key = user_api_key if user_api_key else st.secrets.get("GEMINI_API_KEY")
 
-tema = st.text_input("¿Qué vamos a aprender hoy?", placeholder="Ej: Suma de fracciones")
+model_name = st.sidebar.selectbox("Model:", ["gemini-1.5-flash", "gemini-1.5-pro"])
 
-if st.button("Generar Material"):
-    if tema:
-        try:
-            with st.spinner("Conectando con el servidor de Google..."):
-                # Pedimos la explicación
-                response = model.generate_content(f"Actúa como un profesor. Explica brevemente: {tema}")
-                st.markdown("### 📝 Contenido Sugerido:")
-                st.write(response.text)
-        except Exception as e:
-            # Si gemini-pro también falla, es la API KEY
-            st.error("Error de autenticación. Por favor, revisa que tu API KEY en Secrets sea correcta y no tenga espacios.")
-            st.info("Asegúrate de que en Secrets diga: GOOGLE_API_KEY = 'Tu_Clave_Aquí'")
-    else:
-        st.warning("Escribe un tema primero.")
+if not api_key:
+    st.warning("⚠️ Please enter your Google AI Studio API Key in the sidebar to start.")
+    st.stop()
 
-st.divider()
-st.caption("Proyecto de Maestría en Tecnología Educativa - Edgar Romero Valero")
+# Initialize Gemini
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel(
+    model_name=model_name,
+    system_instruction="You are an expert Math Tutor. Focus on conceptual reasoning. Don't give answers immediately; provide step-by-step scaffolding."
+)
+
+st.title("Math-Online-Lab 🧠")
+st.markdown("---")
+
+# Chat History
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# User Input
+if prompt := st.chat_input("Ask a math question..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        response = model.generate_content(prompt)
+        st.markdown(response.text)
+        st.session_state.messages.append({"role": "assistant", "content": response.text})
